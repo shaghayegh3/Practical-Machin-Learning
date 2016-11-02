@@ -1,0 +1,102 @@
+---
+title: "practical machine learning-project"
+output: html_document
+---
+Shaghayegh Kazemlou
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Goal
+
+The goal is to predict "classe" variable in the training set which is the way they exercise. 
+
+##Setup and load data
+
+```{r warning=FALSE, message=FALSE}
+library(rpart)
+library(caret)
+library(rattle)
+library(randomForest)
+library(RColorBrewer)
+library(knitr)
+library(rpart.plot)
+set.seed(1200)
+
+setwd("E:/Shaghayegh/Coursera")
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+dim(training);dim(testing)
+```
+
+##data cleaning
+###remove NA,remove low variance variables
+```{r warning=FALSE, message=FALSE}
+training <- training[, colSums(is.na(training)) == 0]
+nzv <- nearZeroVar(training, saveMetrics=TRUE)
+training <- training[,nzv$nzv==FALSE]
+
+dim(training)
+```
+##Split data
+split the training set into a training set (train, 60%) for prediction and a validation set (valid 40%) to compute the out-of-sample errors.
+```{r warning=FALSE, message=FALSE}
+train <- createDataPartition(training$classe,p=0.6,list=FALSE)
+trainset <- training[train, ]
+testset <- training[-train, ]
+
+
+trainset <- trainset[c(-1)]
+clean1 <- colnames(trainset)
+clean2 <- colnames(trainset[, -58]) #remove classe column
+testset <- testset[clean1]
+testing <- testing[clean2]
+```
+##Coerce to the same type
+```{r warning=FALSE, message=FALSE}
+for (i in 1:length(testing) ) {
+  for(j in 1:length(trainset)) {
+    if( length( grep(names(trainset[i]), names(testing)[j]) ) == 1)  {
+      class(testing[j]) <- class(trainset[i])
+    }      
+  }      
+}
+testing <- rbind(trainset[2, -58] , testing)
+testing <- testing[-1,]
+```
+##Decision tree prediction
+```{r warning=FALSE, message=FALSE}
+model1 <- rpart(classe ~ ., data=trainset, method="class")
+fancyRpartPlot(model1)
+```
+
+##Predict validation set, decision tree
+```{r warning=FALSE, message=FALSE}
+predict1 <- predict(model1, testset, type = "class")
+(conf1 <- confusionMatrix(predict1, testset$classe))
+(accuracy1<- conf1$overall[1])
+```
+the accuracy rate is 0.87, now lets try random forest method and compare the results.
+
+##Random Forest prediction
+```{r warning=FALSE, message=FALSE}
+model2 <- randomForest(classe ~ ., data=trainset, method="class")
+```
+
+##Predict validation set, random forest
+```{r warning=FALSE, message=FALSE}
+predict2 <- predict(model2, testset, type = "class")
+(conf2 <- confusionMatrix(predict2, testset$classe))
+(accuracy2<- conf2$overall[1])
+```
+as we can see, the random forest method is much better than decision tree method. The accuracy rate is 0.99.
+
+
+
+##Prediction on testing set
+```{r warning=FALSE, message=FALSE}
+predict(model2, testing, type = "class")
+
+```
+
